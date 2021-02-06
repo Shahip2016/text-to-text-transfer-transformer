@@ -17,7 +17,7 @@
 import inspect
 import itertools
 import os
-from typing import Any, Callable, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Mapping, Optional, Sequence, Tuple, Union
 
 from absl import logging
 import dataclasses
@@ -176,7 +176,7 @@ class PredictFnCallable(typing_extensions.Protocol):
       self,
       dataset: tf.data.Dataset,
       model_feature_lengths: Mapping[str, int]
-  ) -> Sequence[Tuple[int, Sequence[int]]]: ...
+  ) -> Sequence[Tuple[int, Sequence[int]]]:    ...
 
 
 class ScoreFnCallable(typing_extensions.Protocol):
@@ -185,7 +185,7 @@ class ScoreFnCallable(typing_extensions.Protocol):
       self,
       dataset: tf.data.Dataset,
       model_feature_lengths: Mapping[str, int]
-  ) -> Sequence[Tuple[int, float]]: ...
+  ) -> Sequence[Tuple[int, float]]:    ...
 
 
 class LogFnCallable(typing_extensions.Protocol):
@@ -195,7 +195,7 @@ class LogFnCallable(typing_extensions.Protocol):
       task_metrics: Mapping[str, Metric],
       step: int,
       task_name: str
-  ) -> None: ...
+  ) -> None:    ...
 
 
 class Evaluator:
@@ -231,8 +231,8 @@ class Evaluator:
   """
 
   def __init__(self,
-               mixture_or_task_name: str,
-               feature_converter: FeatureConverter = EncDecFeatureConverter,
+               mixture_or_task_name: Union[str, Task],
+               feature_converter: FeatureConverter,
                eval_split: str = "validation",
                use_cached: bool = False,
                sequence_length: Mapping[str, int] = None,
@@ -262,9 +262,13 @@ class Evaluator:
       ValueError if `sequence_length` is None but a preprocessor depends on its
       value.
     """
+    if isinstance(mixture_or_task_name, str):
+      task = dataset_providers.get_mixture_or_task(mixture_or_task_name)
+    else:
+      task = mixture_or_task_name
+
     logging.info("Initializing Evaluator for '%s'", mixture_or_task_name)
-    eval_tasks = dataset_providers.get_subtasks(
-        dataset_providers.get_mixture_or_task(mixture_or_task_name))
+    eval_tasks = dataset_providers.get_subtasks(task)
     self._eval_tasks = get_valid_eval_tasks(eval_tasks, eval_split)
 
     if not self._eval_tasks:
@@ -478,7 +482,6 @@ class Evaluator:
             task.postprocess_fn(d, example=ex, is_target=False)
             for d, ex in zip(outputs, tfds.as_numpy(task_dataset))
         ]
-
         task_metrics.extend([
             metric_fn(targets, predictions) for metric_fn in
             task.predict_metric_fns
