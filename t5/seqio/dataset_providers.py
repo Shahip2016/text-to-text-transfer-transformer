@@ -151,6 +151,11 @@ class DatasetProviderRegistry(object):
     return cls._REGISTRY.keys()
 
   @classmethod
+  def reset(cls):
+    """Removes all of the registered tasks."""
+    cls._REGISTRY = {}
+
+  @classmethod
   def get_dataset(
       cls,
       name,
